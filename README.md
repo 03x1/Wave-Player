@@ -1,6 +1,6 @@
 # Wave Player
 
-Please 🌟 the project so more people find Wave Player!
+Please ⭐ the project so more people find Wave Player!
 
 Check out the **[live demo](https://03x1.github.io/Wave-Player/)**
 

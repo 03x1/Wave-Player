@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Wave Player",
+    "description": "Apple Music–style always-on-top miniplayer for Spotify. Liquid Glass UI, synced lyrics, live album-art colors, and three modes: compact, expanded, and lyrics.",
+    "preview": "preview.png",
+    "main": "waveplayer.js",
+    "readme": "README.md",
+    "authors": [{ "name": "Sam", "url": "https://github.com/03x1" }],
+    "tags": ["miniplayer", "player", "mini", "lyrics", "liquid-glass", "liquid", "glass", "apple-music", "apple", "pip"]
+  }
+]

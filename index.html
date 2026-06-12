@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An Apple Music–style miniplayer for Spotify">
+<title>Wave Player</title>
+<style>
+/* ════════ Page chrome ════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Segoe UI Variable Display','Segoe UI','Helvetica Neue',sans-serif;
+  background:#08080a;color:#fff;-webkit-font-smoothing:antialiased;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:34px;padding:40px 24px;
+}
+h1{font-size:40px;font-weight:800;letter-spacing:-.03em;text-align:center;line-height:1.15}
+h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-top:6px;
+  background:linear-gradient(90deg,#a9e8d8,#7fd4c4,#9fd6ef);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:rgba(255,255,255,.45);font-size:14px;font-weight:500;margin-top:-24px;text-align:center;max-width:560px;line-height:1.5}
+.cta{display:flex;gap:10px;margin-top:-14px}
+.cta a{display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:12px;
+  font-size:13px;font-weight:700;text-decoration:none;color:#fff;
+  background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14);
+  transition:background .15s}
+.cta a:hover{background:rgba(255,255,255,.16)}
+.cta a.primary{background:linear-gradient(90deg,#3fa18c,#6cc6b4);box-shadow:0 6px 22px rgba(110,200,180,.28)}
+.cta svg{width:15px;height:15px;fill:currentColor}
+.row{display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+.stack{display:flex;flex-direction:column;gap:12px;align-items:center}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+
+/* ════════ Window frame (simulates the PiP window) ════════ */
+.win{
+  position:relative;overflow:hidden;border-radius:14px;
+  background:#0e1514;
+  box-shadow:0 40px 90px rgba(0,0,0,.7),0 12px 32px rgba(0,0,0,.5),
+             inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 .5px 0 rgba(255,255,255,.18);
+  --accent:#8fd8c7;--accent-glow:rgba(143,216,199,.32);--heart:#ff5c5c;
+  --glass:rgba(255,255,255,.07);--glass-hi:rgba(255,255,255,.13);
+  --hairline:rgba(255,255,255,.12);
+  --txt-2:rgba(255,255,255,.55);--txt-3:rgba(255,255,255,.38);
+}
+.win.compact{width:460px;height:80px}
+.win.expanded{width:390px;height:546px}
+.win.lyrics{width:390px;height:640px}
+
+/* ── Ambient background ── */
+.bgWrap{position:absolute;inset:0;z-index:0;overflow:hidden}
+.bgl{position:absolute;inset:-90px;background-size:cover;background-position:center;
+  filter:blur(72px) saturate(1.95) brightness(.46);
+  animation:drift 44s ease-in-out infinite alternate}
+@keyframes drift{0%{transform:scale(1.16) rotate(0)}100%{transform:scale(1.34) rotate(5deg)}}
+.ov{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% -10%,rgba(255,255,255,.07),transparent 55%),
+  linear-gradient(180deg,rgba(0,0,0,.10) 0%,rgba(0,0,0,.34) 55%,rgba(0,0,0,.62) 100%)}
+.grain{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size:160px 160px}
+.root{position:relative;z-index:10;height:100%;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Marquee ── */
+.mqwrap{overflow:hidden;white-space:nowrap;max-width:100%;
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 92%,transparent);
+  mask-image:linear-gradient(90deg,#000 0,#000 92%,transparent)}
+.mq{display:inline-block;white-space:nowrap}
+
+/* ════════ COMPACT ════════ */
+.cbar{display:flex;align-items:center;height:100%;padding:0 12px;gap:11px;overflow:hidden}
+.ca{width:56px;height:56px;flex-shrink:0;border-radius:11px;object-fit:cover;
+  box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.12)}
+.ci{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1px}
+.ct{font-size:13px;font-weight:700;letter-spacing:-.015em;line-height:1.25}
+.cr{font-size:11px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp{height:10px;display:flex;align-items:center;margin-top:4px;cursor:pointer}
+.cpt{height:3px;flex:1;background:rgba(255,255,255,.18);border-radius:3px;overflow:hidden;transition:height .18s}
+.cp:hover .cpt{height:5px}
+.cpf{height:100%;background:rgba(255,255,255,.92);border-radius:3px}
+.cbtns{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.cpill{display:flex;align-items:center;gap:1px;padding:3px;border-radius:999px;
+  position:relative;margin-right:7px;background:rgba(255,255,255,.07);
+  backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.09)}
+.cb{background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;width:32px;height:32px;color:rgba(255,255,255,.82);
+  transition:color .14s,background .14s,transform .12s cubic-bezier(.34,1.56,.64,1)}
+.cb:hover{color:#fff;background:var(--glass)}
+.cb:active{transform:scale(.82)}
+.cb svg{fill:currentColor;width:15px;height:15px;display:block}
+.cb.cplay{width:36px;height:36px;color:#fff;background:var(--glass-hi);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.1),inset 0 .5px 0 rgba(255,255,255,.16)}
+.cb.cplay svg{width:18px;height:18px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
+.cb.cplay:hover{background:rgba(255,255,255,.2)}
+.cb.csec{width:30px;height:30px;border-radius:10px;color:rgba(255,255,255,.5)}
+.cb.csec:hover{color:#fff}
+.cb.hon{color:var(--heart)!important}
+
+/* ════════ Drag handle ════════ */
+.dh{height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:grab}
+.dp{width:36px;height:4.5px;border-radius:3px;background:rgba(255,255,255,.22)}
+
+/* ════════ EXPANDED ════════ */
+.artSec{flex:1 1 auto;min-height:0;padding:2px 28px 12px;display:flex;align-items:center;justify-content:center}
+.af{position:relative;aspect-ratio:1;height:100%;max-width:100%;max-height:334px}
+.artImg{width:100%;height:100%;object-fit:cover;border-radius:18px;display:block;
+  box-shadow:0 30px 72px rgba(0,0,0,.74),0 12px 30px rgba(0,0,0,.52),
+  0 0 64px var(--accent-glow),0 0 0 .5px rgba(255,255,255,.14)}
+.infoSec{flex:0 0 auto;padding:0 24px 2px}
+.ir{display:flex;align-items:center;gap:10px}
+.it{flex:1;min-width:0}
+.etitle{font-size:18px;font-weight:700;letter-spacing:-.022em;line-height:1.22}
+.eartist{font-size:14px;font-weight:500;color:var(--txt-2);letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.hb{background:none;border:none;cursor:pointer;flex-shrink:0;width:38px;height:38px;
+  border-radius:12px;display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,.45);transition:all .15s}
+.hb:hover{color:#fff;background:var(--glass)}
+.hb svg{fill:currentColor;width:20px;height:20px;display:block}
+.hb.liked{color:var(--heart)}
+.ctrlCard{flex:0 0 auto;margin:6px 12px 12px;padding:10px 16px 8px;position:relative;
+  background:rgba(18,18,22,.36);border-radius:24px;
+  backdrop-filter:blur(40px) saturate(1.7);-webkit-backdrop-filter:blur(40px) saturate(1.7);
+  box-shadow:0 18px 44px rgba(0,0,0,.48),0 2px 10px rgba(0,0,0,.28),inset 0 0 0 .5px rgba(255,255,255,.05)}
+.ctrlCard::before{content:'';position:absolute;top:0;left:16%;right:16%;height:1px;border-radius:1px;
+  pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent)}
+.progSec{flex:0 0 auto;padding:2px 8px 0}
+.pw{position:relative;height:18px;cursor:pointer;display:flex;align-items:center}
+.pt{flex:1;height:5px;background:rgba(255,255,255,.2);border-radius:4px;overflow:hidden;transition:height .2s,background .2s}
+.pw:hover .pt{height:8px;background:rgba(255,255,255,.26)}
+.pf{height:100%;background:rgba(255,255,255,.9);border-radius:4px}
+.times{display:flex;justify-content:space-between;margin-top:5px}
+.tm{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--txt-3);font-variant-numeric:tabular-nums}
+.ctrlSec{flex:0 0 auto;padding:0 8px}
+.ctrlrow{display:flex;align-items:center;justify-content:space-between}
+.eb{background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-radius:13px;color:rgba(255,255,255,.92);position:relative;
+  transition:color .14s,background .14s,transform .13s cubic-bezier(.34,1.56,.64,1)}
+.eb:hover{background:var(--glass)}
+.eb:active{transform:scale(.8)}
+.eb svg{fill:currentColor;display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
+.eb.sm{width:40px;height:40px;color:rgba(255,255,255,.6)}.eb.sm svg{width:17px;height:17px}
+.eb.sm:hover{color:#fff}
+.eb.md{width:50px;height:50px}.eb.md svg{width:26px;height:26px}
+.eb.on{color:var(--accent)!important}
+.eplay{width:62px!important;height:62px!important}
+.eplay svg{width:34px!important;height:34px!important;filter:drop-shadow(0 3px 9px rgba(0,0,0,.5))!important}
+.rbadge{position:absolute;top:5px;right:5px;width:12px;height:12px;border-radius:50%;
+  background:var(--accent);color:#000;font-size:8px;font-weight:800;line-height:12px;text-align:center;display:none}
+.eb.r1 .rbadge,.lb.r1 .rbadge{display:block}
+.volSec{flex:0 0 auto;padding:2px 8px 6px;display:flex;align-items:center;gap:11px}
+.vb{background:none;border:none;color:var(--txt-3);width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.vb svg{width:14px;height:14px;fill:currentColor}
+.vs{flex:1;height:5px;border-radius:4px;background:linear-gradient(90deg,rgba(255,255,255,.9) 64%,rgba(255,255,255,.16) 64%)}
+.expFooter{flex:0 0 auto;margin-top:4px;padding:4px 2px 0;
+  display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid rgba(255,255,255,.06)}
+.foot-btn{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:7px;
+  color:var(--txt-2);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
+  padding:7px 11px;border-radius:11px;transition:all .15s}
+.foot-btn:hover{color:#fff;background:var(--glass-hi)}
+.foot-btn svg{fill:currentColor;width:14px;height:14px;flex-shrink:0}
+.foot-icon{background:none;border:none;cursor:pointer;width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;border-radius:10px;
+  color:var(--txt-3);transition:all .15s}
+.foot-icon:hover{color:#fff;background:var(--glass-hi)}
+.foot-icon svg{fill:currentColor;width:14px;height:14px}
+
+/* ════════ LYRICS ════════ */
+.lyrHeader{flex:0 0 auto;margin:8px 12px 2px;padding:9px 14px;display:flex;align-items:center;gap:11px;
+  position:relative;background:rgba(18,18,22,.32);border-radius:20px;
+  backdrop-filter:blur(36px) saturate(1.7);-webkit-backdrop-filter:blur(36px) saturate(1.7);
+  box-shadow:0 10px 30px rgba(0,0,0,.32),inset 0 0 0 .5px rgba(255,255,255,.05)}
+.lyrHeader::before,.lyrCtrl::before{content:'';position:absolute;top:0;left:16%;right:16%;height:1px;
+  border-radius:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent)}
+.lyrThumb{width:42px;height:42px;flex-shrink:0;border-radius:10px;object-fit:cover;
+  box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 .5px rgba(255,255,255,.12)}
+.lyrtitle{font-size:14px;font-weight:700;letter-spacing:-.015em;line-height:1.25}
+.lyrartist{font-size:12px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.lyrh-btn{background:none;border:none;cursor:pointer;width:32px;height:32px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);transition:all .15s}
+.lyrh-btn:hover{color:#fff;background:var(--glass)}
+.lyrh-btn svg{fill:currentColor;width:16px;height:16px;display:block}
+.lyrh-btn.liked{color:var(--heart)}
+.lyrWrap{flex:1;min-height:0;position:relative;overflow:hidden;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 60px,#000 calc(100% - 76px),transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 60px,#000 calc(100% - 76px),transparent 100%)}
+.lyrScroll{height:100%;overflow-y:auto;padding:30px 24px 90px;scrollbar-width:none}
+.lyrScroll::-webkit-scrollbar{display:none}
+.lyric{font-size:22px;font-weight:800;letter-spacing:-.022em;line-height:1.26;
+  color:rgba(255,255,255,.30);padding:7px 0;cursor:pointer;user-select:none;
+  transform-origin:left center;transform:scale(.97);filter:blur(1.3px);
+  transition:color .4s cubic-bezier(.4,0,.2,1),filter .4s cubic-bezier(.4,0,.2,1),
+  transform .4s cubic-bezier(.34,1.2,.4,1)}
+.lyric:hover{color:rgba(255,255,255,.62)!important;filter:blur(0)!important}
+.lyric.past{color:rgba(255,255,255,.42);filter:blur(.7px)}
+.lyric.active{color:#fff;transform:scale(1.03);filter:blur(0);
+  text-shadow:0 0 34px rgba(255,255,255,.16),0 0 64px var(--accent-glow)}
+.lyrCtrl{flex:0 0 auto;margin:0 12px 12px;padding:12px 18px 14px;position:relative;
+  background:rgba(18,18,22,.38);border-radius:24px;
+  backdrop-filter:blur(40px) saturate(1.7);-webkit-backdrop-filter:blur(40px) saturate(1.7);
+  box-shadow:0 18px 44px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.28),inset 0 0 0 .5px rgba(255,255,255,.05)}
+.lpw{position:relative;height:16px;cursor:pointer;display:flex;align-items:center;margin-bottom:2px}
+.lpt{flex:1;height:4px;background:rgba(255,255,255,.2);border-radius:4px;overflow:hidden;transition:height .2s}
+.lpw:hover .lpt{height:7px}
+.lpf{height:100%;background:rgba(255,255,255,.9);border-radius:4px}
+.ltimes{display:flex;justify-content:space-between;margin-bottom:6px}
+.ltm{font-size:10px;font-weight:600;color:var(--txt-3);font-variant-numeric:tabular-nums}
+.lctrlrow{display:flex;align-items:center;justify-content:space-between}
+.lb{background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-radius:12px;color:rgba(255,255,255,.92);position:relative;
+  transition:color .14s,background .14s,transform .13s cubic-bezier(.34,1.56,.64,1)}
+.lb:hover{background:var(--glass-hi)}
+.lb:active{transform:scale(.8)}
+.lb svg{fill:currentColor;display:block;filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
+.lb.lsm{width:38px;height:38px;color:rgba(255,255,255,.6)}.lb.lsm svg{width:16px;height:16px}
+.lb.lsm:hover{color:#fff}
+.lb.lmd{width:46px;height:46px}.lb.lmd svg{width:23px;height:23px}
+.lb.on{color:var(--accent)!important}
+.lplay{width:54px!important;height:54px!important}
+.lplay svg{width:28px!important;height:28px!important}
+.note{max-width:780px;color:rgba(255,255,255,.4);font-size:13px;line-height:1.6;text-align:center}
+.note a{color:rgba(255,255,255,.7)}
+</style>
+</head>
+<body>
+
+<h1>Wave Player<span>Liquid Glass</span></h1>
+<p class="sub">An Apple Music–style miniplayer for Spotify, built as a Spicetify extension.
+This page is a live demo of the UI - in the real player everything is powered by your music.</p>
+<div class="cta">
+  <a class="primary" href="https://spicetify.app/docs/getting-started" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-7 4h14v-2H5v2z"/></svg>
+    Install with Spicetify
+  </a>
+  <a href="./README.md">Read the docs</a>
+</div>
+
+<div class="row">
+
+  <!-- ════════ EXPANDED ════════ -->
+  <div class="stack">
+    <span class="lbl">Expanded · 390×546</span>
+    <div class="win expanded">
+      <div class="bgWrap"><div class="bgl" id="bg1"></div></div>
+      <div class="ov"></div><div class="grain"></div>
+      <div class="root">
+        <div class="dh"><div class="dp"></div></div>
+        <div class="artSec"><div class="af"><img class="artImg" id="art1" alt="Album art"></div></div>
+        <div class="infoSec">
+          <div class="ir">
+            <div class="it">
+              <div class="mqwrap etitle"><span class="mq">Dawn in the Adan</span></div>
+              <div class="eartist">Ichiko Aoba</div>
+            </div>
+            <button class="hb liked"><svg viewBox="0 0 16 16"><path d="M15.724 4.22A4.313 4.313 0 0 0 12.192.814a4.269 4.269 0 0 0-3.622 1.13.837.837 0 0 1-1.14 0 4.272 4.272 0 0 0-6.21 5.855l5.916 7.05a1.128 1.128 0 0 0 1.727 0l5.916-7.05a4.228 4.228 0 0 0 .945-3.577z"/></svg></button>
+          </div>
+        </div>
+        <div class="ctrlCard">
+        <div class="progSec">
+          <div class="pw"><div class="pt"><div class="pf" style="width:42%"></div></div></div>
+          <div class="times"><span class="tm">2:00</span><span class="tm">4:45</span></div>
+        </div>
+        <div class="ctrlSec">
+          <div class="ctrlrow">
+            <button class="eb sm on"><svg viewBox="0 0 16 16"><path d="M13.151.922a.75.75 0 1 0-1.06 1.06L13.109 3H11.16a3.75 3.75 0 0 0-2.873 1.34l-6.173 7.356A2.25 2.25 0 0 1 .39 12.5H0V14h.391a3.75 3.75 0 0 0 2.873-1.34l6.173-7.356a2.25 2.25 0 0 1 1.724-.804h1.947l-1.017 1.018a.75.75 0 0 0 1.06 1.06l2.306-2.306a.75.75 0 0 0 0-1.06L13.15.922zM.391 3.5H0V2h.391c1.109 0 2.16.49 2.873 1.34L4.89 5.277l-.979 1.167-1.796-2.14A2.25 2.25 0 0 0 .39 3.5z"/><path d="m7.5 10.723.98-1.167 1.796 2.14a2.25 2.25 0 0 0 1.724.804h1.947l-1.017-1.018a.75.75 0 1 1 1.06-1.06l2.306 2.306a.75.75 0 0 1 0 1.06l-2.306 2.306a.75.75 0 1 1-1.06-1.06L14.109 14H12.16a3.75 3.75 0 0 1-2.873-1.34l-1.787-2.14z"/></svg></button>
+            <button class="eb md"><svg viewBox="0 0 16 16"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15l9.95-5.744a.7.7 0 0 1 1.05.606v12.575a.7.7 0 0 1-1.05.607L4 9.149V14.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg></button>
+            <button class="eb md eplay"><svg viewBox="0 0 16 16"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg></button>
+            <button class="eb md"><svg viewBox="0 0 16 16"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.107A.7.7 0 0 0 1 1.712v12.575a.7.7 0 0 0 1.05.607L12 9.149V14.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg></button>
+            <button class="eb sm on r1"><svg viewBox="0 0 16 16"><path d="M0 4.75A3.75 3.75 0 0 1 3.75 1h8.5A3.75 3.75 0 0 1 16 4.75v5a3.75 3.75 0 0 1-3.75 3.75H9.81l1.018 1.018a.75.75 0 1 1-1.06 1.06L7.617 13.426a.75.75 0 0 1 0-1.06l2.15-2.152a.75.75 0 1 1 1.062 1.06l-.966.967h1.887A2.25 2.25 0 0 0 14.5 9.75v-5A2.25 2.25 0 0 0 12.25 2.5h-8.5A2.25 2.25 0 0 0 1.5 4.75v5A2.25 2.25 0 0 0 3.75 11.5H5v1.5H3.75A3.75 3.75 0 0 1 0 9.75v-5z"/></svg><span class="rbadge">1</span></button>
+          </div>
+        </div>
+        <div class="volSec">
+          <span class="vb"><svg viewBox="0 0 16 16"><path d="M9.741.85a.75.75 0 0 1 .375.65v13a.75.75 0 0 1-1.125.65l-6.925-4a3.642 3.642 0 0 1-1.33-4.967 3.639 3.639 0 0 1 1.33-1.332l6.925-4a.75.75 0 0 1 .75 0z"/></svg></span>
+          <div class="vs"></div>
+          <span class="vb"><svg viewBox="0 0 16 16"><path d="M9.741.85a.75.75 0 0 1 .375.65v13a.75.75 0 0 1-1.125.65l-6.925-4a3.642 3.642 0 0 1-1.33-4.967 3.639 3.639 0 0 1 1.33-1.332l6.925-4a.75.75 0 0 1 .75 0zm1.759 11.387a4.502 4.502 0 0 0 0-8.474v1.65a2.999 2.999 0 0 1 0 5.175v1.649z"/></svg></span>
+        </div>
+        <div class="expFooter">
+          <button class="foot-btn"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg> Lyrics</button>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button class="foot-icon"><svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg></button>
+            <button class="foot-icon"><svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 0 1-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 0 1 .947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 0 1 2.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 0 1 2.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 0 1 .947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 0 1-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 0 1-2.287-.947zM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" clip-rule="evenodd"/></svg></button>
+            <button class="foot-icon" title="Close player"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ LYRICS ════════ -->
+  <div class="stack">
+    <span class="lbl">Lyrics · 390×640</span>
+    <div class="win lyrics">
+      <div class="bgWrap"><div class="bgl" id="bg2"></div></div>
+      <div class="ov"></div><div class="grain"></div>
+      <div class="root">
+        <div class="dh"><div class="dp"></div></div>
+        <div class="lyrHeader">
+          <img class="lyrThumb" id="art2" alt="Album art">
+          <div class="it" style="flex:1;min-width:0">
+            <div class="mqwrap lyrtitle"><span class="mq">Dawn in the Adan</span></div>
+            <div class="lyrartist">Ichiko Aoba</div>
+          </div>
+          <button class="lyrh-btn liked"><svg viewBox="0 0 16 16"><path d="M15.724 4.22A4.313 4.313 0 0 0 12.192.814a4.269 4.269 0 0 0-3.622 1.13.837.837 0 0 1-1.14 0 4.272 4.272 0 0 0-6.21 5.855l5.916 7.05a1.128 1.128 0 0 0 1.727 0l5.916-7.05a4.228 4.228 0 0 0 .945-3.577z"/></svg></button>
+          <button class="lyrh-btn"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></button>
+          <button class="lyrh-btn" title="Close player"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+        </div>
+        <div class="lyrWrap">
+          <div class="lyrScroll" id="lyrDemo">
+            <div class="lyric past">夜明けのざわめき</div>
+            <div class="lyric past">ここには誰もいないけれど</div>
+            <div class="lyric active">落ちてきた星屑が</div>
+            <div class="lyric">東の空に帰っていくの</div>
+            <div class="lyric">明日、ここに</div>
+            <div class="lyric">見える姿はないのかも</div>
+            <div class="lyric">それでも、最後</div>
+            <div class="lyric">昔の海の音を</div>
+            <div class="lyric">彼岸の小舟から</div>
+            <div class="lyric">ここへ何か知らせているの</div>
+            <div class="lyric">すべては聞こえない</div>
+            <div class="lyric">心が確かに震えるけれど</div>
+            <div class="lyric">高く空に両手を伸ばしていても</div>
+            <div class="lyric">途切れてしまう</div>
+            <div class="lyric">いつでもここは明けているよ</div>
+            <div class="lyric">まだ、こない</div>
+            <div class="lyric">ずっと待ち続けている</div>
+            <div class="lyric">海を渡る 子どもたち</div>
+            <div class="lyric">花と目覚める</div>
+            <div class="lyric">海を渡る 子どもたち</div>
+            <div class="lyric">皮膚を裂いて</div>
+            <div class="lyric">これは中に身体から</div>
+            <div class="lyric">海が溢れて美しい生き物</div>
+            <div class="lyric">外へ出ていく</div>
+          </div>
+        </div>
+        <div class="lyrCtrl">
+          <div class="lpw"><div class="lpt"><div class="lpf" style="width:42%"></div></div></div>
+          <div class="ltimes"><span class="ltm">2:00</span><span class="ltm">4:45</span></div>
+          <div class="lctrlrow">
+            <button class="lb lsm"><svg viewBox="0 0 16 16"><path d="M13.151.922a.75.75 0 1 0-1.06 1.06L13.109 3H11.16a3.75 3.75 0 0 0-2.873 1.34l-6.173 7.356A2.25 2.25 0 0 1 .39 12.5H0V14h.391a3.75 3.75 0 0 0 2.873-1.34l6.173-7.356a2.25 2.25 0 0 1 1.724-.804h1.947l-1.017 1.018a.75.75 0 0 0 1.06 1.06l2.306-2.306a.75.75 0 0 0 0-1.06L13.15.922zM.391 3.5H0V2h.391c1.109 0 2.16.49 2.873 1.34L4.89 5.277l-.979 1.167-1.796-2.14A2.25 2.25 0 0 0 .39 3.5z"/><path d="m7.5 10.723.98-1.167 1.796 2.14a2.25 2.25 0 0 0 1.724.804h1.947l-1.017-1.018a.75.75 0 1 1 1.06-1.06l2.306 2.306a.75.75 0 0 1 0 1.06l-2.306 2.306a.75.75 0 1 1-1.06-1.06L14.109 14H12.16a3.75 3.75 0 0 1-2.873-1.34l-1.787-2.14z"/></svg></button>
+            <button class="lb lmd"><svg viewBox="0 0 16 16"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15l9.95-5.744a.7.7 0 0 1 1.05.606v12.575a.7.7 0 0 1-1.05.607L4 9.149V14.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg></button>
+            <button class="lb lmd lplay"><svg viewBox="0 0 16 16"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg></button>
+            <button class="lb lmd"><svg viewBox="0 0 16 16"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.107A.7.7 0 0 0 1 1.712v12.575a.7.7 0 0 0 1.05.607L12 9.149V14.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg></button>
+            <button class="lb lsm"><svg viewBox="0 0 16 16"><path d="M0 4.75A3.75 3.75 0 0 1 3.75 1h8.5A3.75 3.75 0 0 1 16 4.75v5a3.75 3.75 0 0 1-3.75 3.75H9.81l1.018 1.018a.75.75 0 1 1-1.06 1.06L7.617 13.426a.75.75 0 0 1 0-1.06l2.15-2.152a.75.75 0 1 1 1.062 1.06l-.966.967h1.887A2.25 2.25 0 0 0 14.5 9.75v-5A2.25 2.25 0 0 0 12.25 2.5h-8.5A2.25 2.25 0 0 0 1.5 4.75v5A2.25 2.25 0 0 0 3.75 11.5H5v1.5H3.75A3.75 3.75 0 0 1 0 9.75v-5z"/></svg><span class="rbadge">1</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ════════ COMPACT ════════ -->
+<div class="stack">
+  <span class="lbl">Compact · 460×80</span>
+  <div class="win compact">
+    <div class="bgWrap"><div class="bgl" id="bg3"></div></div>
+    <div class="ov"></div><div class="grain"></div>
+    <div class="root">
+      <div class="cbar">
+        <img class="ca" id="art3" alt="Album art">
+        <div class="ci">
+          <div class="mqwrap ct"><span class="mq">Dawn in the Adan</span></div>
+          <span class="cr">Ichiko Aoba</span>
+          <div class="cp"><div class="cpt"><div class="cpf" style="width:42%"></div></div></div>
+        </div>
+        <div class="cbtns">
+          <div class="cpill">
+            <button class="cb"><svg viewBox="0 0 16 16"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15l9.95-5.744a.7.7 0 0 1 1.05.606v12.575a.7.7 0 0 1-1.05.607L4 9.149V14.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg></button>
+            <button class="cb cplay"><svg viewBox="0 0 16 16"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg></button>
+            <button class="cb"><svg viewBox="0 0 16 16"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.107A.7.7 0 0 0 1 1.712v12.575a.7.7 0 0 0 1.05.607L12 9.149V14.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg></button>
+          </div>
+          <button class="cb csec hon"><svg viewBox="0 0 16 16"><path d="M15.724 4.22A4.313 4.313 0 0 0 12.192.814a4.269 4.269 0 0 0-3.622 1.13.837.837 0 0 1-1.14 0 4.272 4.272 0 0 0-6.21 5.855l5.916 7.05a1.128 1.128 0 0 0 1.727 0l5.916-7.05a4.228 4.228 0 0 0 .945-3.577z"/></svg></button>
+          <button class="cb csec"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg></button>
+          <button class="cb csec"><svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></button>
+          <button class="cb csec" title="Close player"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// Album art — Ichiko Aoba, "Windswept Adan" (Spotify CDN)
+const cover = 'https://i.scdn.co/image/ab67616d0000b2734b92776a502f280b488cd3ea';
+for (const id of ['art1','art2','art3']) document.getElementById(id).src = cover;
+for (const id of ['bg1','bg2','bg3']) document.getElementById(id).style.backgroundImage = `url(${cover})`;
+
+// Cycle the demo lyrics like the real player
+const lines = document.querySelectorAll('#lyrDemo .lyric');
+let ai = 2;
+setInterval(() => {
+  ai = (ai + 1) % lines.length;
+  lines.forEach((el, i) => {
+    el.classList.remove('active','past');
+    if (i === ai) { el.classList.add('active'); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+    else if (i < ai) el.classList.add('past');
+  });
+}, 2600);
+</script>
+</body>
+</html>

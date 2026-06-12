@@ -1059,5 +1059,15 @@
         }
     }, 8000);
 
-    console.log('[WavePlayer v8] Ready — Liquid Glass UI');
+    // ─────────────────────────────────────────────
+    //  UPDATE NOTICE — one-time notification after an update
+    // ─────────────────────────────────────────────
+    const WP_VERSION = '1.0.0';
+    const WP_NEWS    = 'Wave Player updated to v' + WP_VERSION + 'Thanks for using Wave Player!';
+    if (localStorage.getItem('wp-version') && localStorage.getItem('wp-version') !== WP_VERSION) {
+        Spicetify.showNotification(WP_NEWS);
+    }
+    localStorage.setItem('wp-version', WP_VERSION);
+
+    console.log('[WavePlayer v1] Loaded. Thanks for using Wave Player!');
 })();

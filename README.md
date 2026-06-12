@@ -42,3 +42,4 @@ Big shout out to the projects that inspired Wave Player:
 - [Spictify Lyric Miniplayer](https://github.com/FO-SS/Spictify-Lyric-Miniplayer) by FO-SS
 
 ## Have an Issue/Idea? Open one here on GitHub!
+

@@ -2,6 +2,8 @@
 
 Please 🌟 the project so more people find Wave Player!
 
+Check out the **[live demo](https://03x1.github.io/Wave-Player/)**
+
 ![Preview](preview.png)
 
 # An Apple Music–style Miniplayer for Spotify

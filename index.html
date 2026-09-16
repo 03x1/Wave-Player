@@ -6,7 +6,7 @@
 <meta name="description" content="An Apple Music–style miniplayer for Spotify">
 <title>Wave Player</title>
 <style>
-/* ════════ Page chrome ════════ */
+/* Page */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{min-height:100%}
 body{
@@ -31,7 +31,8 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
 .stack{display:flex;flex-direction:column;gap:12px;align-items:center}
 .lbl{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4)}
 
-/* ════════ Window frame (simulates the PiP window) ════════ */
+/* Window frame
+   Stands in for the PiP window. Sizes match SZ in waveplayer.js. */
 .win{
   position:relative;overflow:hidden;border-radius:14px;
   background:#0e1514;
@@ -39,14 +40,13 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
              inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 .5px 0 rgba(255,255,255,.18);
   --accent:#8fd8c7;--accent-glow:rgba(143,216,199,.32);--heart:#ff5c5c;
   --glass:rgba(255,255,255,.07);--glass-hi:rgba(255,255,255,.13);
-  --hairline:rgba(255,255,255,.12);
   --txt-2:rgba(255,255,255,.55);--txt-3:rgba(255,255,255,.38);
 }
 .win.compact{width:460px;height:80px}
 .win.expanded{width:390px;height:546px}
 .win.lyrics{width:390px;height:640px}
 
-/* ── Ambient background ── */
+/* Background */
 .bgWrap{position:absolute;inset:0;z-index:0;overflow:hidden}
 .bgl{position:absolute;inset:-90px;background-size:cover;background-position:center;
   filter:blur(72px) saturate(1.95) brightness(.46);
@@ -60,13 +60,13 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
   background-size:160px 160px}
 .root{position:relative;z-index:10;height:100%;display:flex;flex-direction:column;overflow:hidden}
 
-/* ── Marquee ── */
+/* Marquee */
 .mqwrap{overflow:hidden;white-space:nowrap;max-width:100%;
   -webkit-mask-image:linear-gradient(90deg,#000 0,#000 92%,transparent);
   mask-image:linear-gradient(90deg,#000 0,#000 92%,transparent)}
 .mq{display:inline-block;white-space:nowrap}
 
-/* ════════ COMPACT ════════ */
+/* Compact */
 .cbar{display:flex;align-items:center;height:100%;padding:0 12px;gap:11px;overflow:hidden}
 .ca{width:56px;height:56px;flex-shrink:0;border-radius:11px;object-fit:cover;
   box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.12)}
@@ -96,11 +96,11 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
 .cb.csec:hover{color:#fff}
 .cb.hon{color:var(--heart)!important}
 
-/* ════════ Drag handle ════════ */
+/* Drag handle */
 .dh{height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:grab}
 .dp{width:36px;height:4.5px;border-radius:3px;background:rgba(255,255,255,.22)}
 
-/* ════════ EXPANDED ════════ */
+/* Expanded */
 .artSec{flex:1 1 auto;min-height:0;padding:2px 28px 12px;display:flex;align-items:center;justify-content:center}
 .af{position:relative;aspect-ratio:1;height:100%;max-width:100%;max-height:334px}
 .artImg{width:100%;height:100%;object-fit:cover;border-radius:18px;display:block;
@@ -166,7 +166,7 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
 .foot-icon:hover{color:#fff;background:var(--glass-hi)}
 .foot-icon svg{fill:currentColor;width:14px;height:14px}
 
-/* ════════ LYRICS ════════ */
+/* Lyrics */
 .lyrHeader{flex:0 0 auto;margin:8px 12px 2px;padding:9px 14px;display:flex;align-items:center;gap:11px;
   position:relative;background:rgba(18,18,22,.32);border-radius:20px;
   backdrop-filter:blur(36px) saturate(1.7);-webkit-backdrop-filter:blur(36px) saturate(1.7);
@@ -188,6 +188,27 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
   mask-image:linear-gradient(to bottom,transparent 0,#000 60px,#000 calc(100% - 76px),transparent 100%)}
 .lyrScroll{height:100%;overflow-y:auto;padding:30px 24px 90px;scrollbar-width:none}
 .lyrScroll::-webkit-scrollbar{display:none}
+/* Vertical volume, pinned to the right gutter of the lyrics. */
+.lvol{position:absolute;right:0;top:0;bottom:0;width:26px;z-index:3;
+  display:flex;align-items:center;justify-content:center;pointer-events:none}
+.lvInner{display:flex;flex-direction:column;align-items:center;gap:7px;pointer-events:auto}
+.lvPct{font-size:9px;font-weight:500;letter-spacing:.03em;color:rgba(255,255,255,.55);
+  font-variant-numeric:tabular-nums;opacity:0;transition:opacity .15s}
+.lvInner:hover .lvPct{opacity:1}
+.lvSlot{position:relative;width:22px;height:118px}
+.lvSlider{-webkit-appearance:none;appearance:none;position:absolute;left:50%;top:50%;
+  width:118px;height:3px;margin:0;border-radius:3px;outline:none;cursor:pointer;
+  transform:translate(-50%,-50%) rotate(-90deg);transition:height .18s ease;
+  background:linear-gradient(90deg,#fff 64%,rgba(255,255,255,.16) 64%)}
+.lvSlider:hover{height:5px}
+.lvSlider::-webkit-slider-thumb{-webkit-appearance:none;width:0;height:0}
+.lvSlider:hover::-webkit-slider-thumb{width:11px;height:11px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.45);cursor:pointer}
+.lvBtn{background:none;border:none;cursor:pointer;padding:0;width:18px;height:18px;
+  display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,.38);transition:color .14s}
+.lvBtn:hover{color:rgba(255,255,255,.82)}
+.lvBtn svg{width:13px;height:13px;fill:currentColor}
 .lyric{font-size:22px;font-weight:800;letter-spacing:-.022em;line-height:1.26;
   color:rgba(255,255,255,.30);padding:7px 0;cursor:pointer;user-select:none;
   transform-origin:left center;transform:scale(.97);filter:blur(1.3px);
@@ -220,8 +241,6 @@ h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.14em;text-t
 .lb.on{color:var(--accent)!important}
 .lplay{width:54px!important;height:54px!important}
 .lplay svg{width:28px!important;height:28px!important}
-.note{max-width:780px;color:rgba(255,255,255,.4);font-size:13px;line-height:1.6;text-align:center}
-.note a{color:rgba(255,255,255,.7)}
 </style>
 </head>
 <body>
@@ -239,7 +258,7 @@ This page is a live demo of the UI - in the real player everything is powered by
 
 <div class="row">
 
-  <!-- ════════ EXPANDED ════════ -->
+  <!-- Expanded -->
   <div class="stack">
     <span class="lbl">Expanded · 390×546</span>
     <div class="win expanded">
@@ -251,8 +270,8 @@ This page is a live demo of the UI - in the real player everything is powered by
         <div class="infoSec">
           <div class="ir">
             <div class="it">
-              <div class="mqwrap etitle"><span class="mq">Dawn in the Adan</span></div>
-              <div class="eartist">Ichiko Aoba</div>
+              <div class="mqwrap etitle"><span class="mq">Low Tide Signal</span></div>
+              <div class="eartist">Harbour Lights</div>
             </div>
             <button class="hb liked"><svg viewBox="0 0 16 16"><path d="M15.724 4.22A4.313 4.313 0 0 0 12.192.814a4.269 4.269 0 0 0-3.622 1.13.837.837 0 0 1-1.14 0 4.272 4.272 0 0 0-6.21 5.855l5.916 7.05a1.128 1.128 0 0 0 1.727 0l5.916-7.05a4.228 4.228 0 0 0 .945-3.577z"/></svg></button>
           </div>
@@ -289,7 +308,7 @@ This page is a live demo of the UI - in the real player everything is powered by
     </div>
   </div>
 
-  <!-- ════════ LYRICS ════════ -->
+  <!-- Lyrics -->
   <div class="stack">
     <span class="lbl">Lyrics · 390×640</span>
     <div class="win lyrics">
@@ -300,8 +319,8 @@ This page is a live demo of the UI - in the real player everything is powered by
         <div class="lyrHeader">
           <img class="lyrThumb" id="art2" alt="Album art">
           <div class="it" style="flex:1;min-width:0">
-            <div class="mqwrap lyrtitle"><span class="mq">Dawn in the Adan</span></div>
-            <div class="lyrartist">Ichiko Aoba</div>
+            <div class="mqwrap lyrtitle"><span class="mq">Low Tide Signal</span></div>
+            <div class="lyrartist">Harbour Lights</div>
           </div>
           <button class="lyrh-btn liked"><svg viewBox="0 0 16 16"><path d="M15.724 4.22A4.313 4.313 0 0 0 12.192.814a4.269 4.269 0 0 0-3.622 1.13.837.837 0 0 1-1.14 0 4.272 4.272 0 0 0-6.21 5.855l5.916 7.05a1.128 1.128 0 0 0 1.727 0l5.916-7.05a4.228 4.228 0 0 0 .945-3.577z"/></svg></button>
           <button class="lyrh-btn"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></button>
@@ -309,30 +328,39 @@ This page is a live demo of the UI - in the real player everything is powered by
         </div>
         <div class="lyrWrap">
           <div class="lyrScroll" id="lyrDemo">
-            <div class="lyric past">夜明けのざわめき</div>
-            <div class="lyric past">ここには誰もいないけれど</div>
-            <div class="lyric active">落ちてきた星屑が</div>
-            <div class="lyric">東の空に帰っていくの</div>
-            <div class="lyric">明日、ここに</div>
-            <div class="lyric">見える姿はないのかも</div>
-            <div class="lyric">それでも、最後</div>
-            <div class="lyric">昔の海の音を</div>
-            <div class="lyric">彼岸の小舟から</div>
-            <div class="lyric">ここへ何か知らせているの</div>
-            <div class="lyric">すべては聞こえない</div>
-            <div class="lyric">心が確かに震えるけれど</div>
-            <div class="lyric">高く空に両手を伸ばしていても</div>
-            <div class="lyric">途切れてしまう</div>
-            <div class="lyric">いつでもここは明けているよ</div>
-            <div class="lyric">まだ、こない</div>
-            <div class="lyric">ずっと待ち続けている</div>
-            <div class="lyric">海を渡る 子どもたち</div>
-            <div class="lyric">花と目覚める</div>
-            <div class="lyric">海を渡る 子どもたち</div>
-            <div class="lyric">皮膚を裂いて</div>
-            <div class="lyric">これは中に身体から</div>
-            <div class="lyric">海が溢れて美しい生き物</div>
-            <div class="lyric">外へ出ていく</div>
+            <div class="lyric past">Harbour lights go out at four</div>
+            <div class="lyric past">Nobody left along the shore</div>
+            <div class="lyric active">Counting the gulls I cannot see</div>
+            <div class="lyric">Salt on the rail, salt on me</div>
+            <div class="lyric">Low tide signal, one long tone</div>
+            <div class="lyric">Carry it out, carry it home</div>
+            <div class="lyric">Everything here is borrowed light</div>
+            <div class="lyric">Held for a while and given back</div>
+            <div class="lyric">The ferry hums its only note</div>
+            <div class="lyric">And I hum somewhere under that</div>
+            <div class="lyric">Wake me when the water turns</div>
+            <div class="lyric">Wake me when the harbour learns</div>
+            <div class="lyric">There is no hurry in the sea</div>
+            <div class="lyric">It has all the time it needs</div>
+            <div class="lyric">Low tide signal, fading out</div>
+            <div class="lyric">Hold the line a little longer</div>
+            <div class="lyric">Morning comes in on its own</div>
+            <div class="lyric">Nothing here to be afraid of</div>
+            <div class="lyric">Just the slow return of blue</div>
+            <div class="lyric">Just the boats remembering</div>
+            <div class="lyric">Where the deep water begins</div>
+            <div class="lyric">And where it lets us stand again</div>
+            <div class="lyric">Harbour lights come on at nine</div>
+            <div class="lyric">Everything back where it was</div>
+          </div>
+          <div class="lvol">
+            <div class="lvInner">
+              <span class="lvPct">64%</span>
+              <div class="lvSlot">
+                <input type="range" class="lvSlider" min="0" max="100" value="64">
+              </div>
+              <button class="lvBtn" title="Mute"><svg viewBox="0 0 16 16"><path d="M9.741.85a.75.75 0 0 1 .375.65v13a.75.75 0 0 1-1.125.65l-6.925-4a3.642 3.642 0 0 1-1.33-4.967 3.639 3.639 0 0 1 1.33-1.332l6.925-4a.75.75 0 0 1 .75 0zm-6.924 5.3a2.139 2.139 0 0 0 0 3.7l5.8 3.35V2.8l-5.8 3.35zm8.683 6.087a4.502 4.502 0 0 0 0-8.474v1.65a2.999 2.999 0 0 1 0 5.175v1.649z"/></svg></button>
+            </div>
           </div>
         </div>
         <div class="lyrCtrl">
@@ -352,7 +380,7 @@ This page is a live demo of the UI - in the real player everything is powered by
 
 </div>
 
-<!-- ════════ COMPACT ════════ -->
+<!-- Compact -->
 <div class="stack">
   <span class="lbl">Compact · 460×80</span>
   <div class="win compact">
@@ -362,8 +390,8 @@ This page is a live demo of the UI - in the real player everything is powered by
       <div class="cbar">
         <img class="ca" id="art3" alt="Album art">
         <div class="ci">
-          <div class="mqwrap ct"><span class="mq">Dawn in the Adan</span></div>
-          <span class="cr">Ichiko Aoba</span>
+          <div class="mqwrap ct"><span class="mq">Low Tide Signal</span></div>
+          <span class="cr">Harbour Lights</span>
           <div class="cp"><div class="cpt"><div class="cpf" style="width:42%"></div></div></div>
         </div>
         <div class="cbtns">
@@ -382,12 +410,32 @@ This page is a live demo of the UI - in the real player everything is powered by
   </div>
 </div>
 <script>
-// Album art — Ichiko Aoba, "Windswept Adan" (Spotify CDN)
-const cover = 'https://i.scdn.co/image/ab67616d0000b2734b92776a502f280b488cd3ea';
+// The demo track, art and words are all made up, so this page doesn't reproduce
+// anyone's lyrics or depend on a CDN URL staying alive.
+const cover = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">' +
+  '<defs>' +
+  '<radialGradient id="a" cx="20%" cy="16%" r="80%"><stop offset="0" stop-color="#ff8a5c"/><stop offset="1" stop-color="#ff8a5c" stop-opacity="0"/></radialGradient>' +
+  '<radialGradient id="b" cx="84%" cy="30%" r="74%"><stop offset="0" stop-color="#b44bff"/><stop offset="1" stop-color="#b44bff" stop-opacity="0"/></radialGradient>' +
+  '<radialGradient id="c" cx="46%" cy="94%" r="82%"><stop offset="0" stop-color="#2fd6c9"/><stop offset="1" stop-color="#2fd6c9" stop-opacity="0"/></radialGradient>' +
+  '</defs>' +
+  '<rect width="400" height="400" fill="#191230"/>' +
+  '<rect width="400" height="400" fill="url(#a)"/>' +
+  '<rect width="400" height="400" fill="url(#b)"/>' +
+  '<rect width="400" height="400" fill="url(#c)"/>' +
+  '</svg>');
 for (const id of ['art1','art2','art3']) document.getElementById(id).src = cover;
 for (const id of ['bg1','bg2','bg3']) document.getElementById(id).style.backgroundImage = `url(${cover})`;
 
-// Cycle the demo lyrics like the real player
+// The lyrics-page volume strip is live in the demo, so you can feel the drag.
+const lv = document.querySelector('.lvSlider'), lvPct = document.querySelector('.lvPct');
+lv.oninput = () => {
+  const v = lv.value;
+  lv.style.background = `linear-gradient(90deg,#fff ${v}%,rgba(255,255,255,.16) ${v}%)`;
+  lvPct.textContent = `${v}%`;
+};
+
+// Fake the synced-lyrics highlight.
 const lines = document.querySelectorAll('#lyrDemo .lyric');
 let ai = 2;
 setInterval(() => {

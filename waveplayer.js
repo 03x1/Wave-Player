@@ -36,9 +36,16 @@
     // A note is either a plain string or a { k, v } pair, which renders as a
     // labelled row. Labels group several related changes under one heading, so
     // the list reads as a spec sheet rather than a wall of sentences.
-    const VERSION = 'v2';
+    const VERSION = 'v2.1';
 
     const CHANGELOG = [
+        {
+            v: 'v2.1',
+            date: 'September 2026',
+            notes: [
+                { k: 'Lyrics', v: 'Fixed the Spotify source giving up after a single rejected request instead of retrying the way v1 did.' },
+            ],
+        },
         {
             v: 'v2',
             date: 'September 2026',
@@ -216,15 +223,27 @@
         return tok ? { Authorization: `Bearer ${tok}`, 'App-Platform': 'WebPlayer' } : null;
     }
 
+    // Whether a failed status is worth re-asking Cosmos about. A 404 is a real
+    // answer — the track has no lyrics there, and Cosmos would be told the same
+    // thing, so a second request only costs time. An auth or rate-limit
+    // rejection is the opposite: Cosmos carries the client's own credentials
+    // rather than the token scraped above, so it can still succeed where this
+    // leg was turned away. Treating those as final is what took the Spotify
+    // provider down in v2 — v1 only ever went through Cosmos, and worked.
+    const retryOnCosmos = s => s === 401 || s === 403 || s === 407 ||
+                               s === 408 || s === 429 || s >= 500;
+
     async function viaFetch(url) {
         const spotify = /(^|\.)spotify\.com$/.test(new URL(url).hostname);
         const headers = spotify ? spotifyAuth() : null;
         if (spotify && !headers) throw new Error('no access token');
 
         const res = await fetch(url, headers ? { headers } : undefined);
-        // A real answer, even a 404. Cosmos would only be told the same thing,
-        // so don't spend a second request finding that out.
-        if (!res.ok) { const e = new Error('HTTP ' + res.status); e.answered = true; throw e; }
+        if (!res.ok) {
+            const e = new Error('HTTP ' + res.status);
+            e.answered = !retryOnCosmos(res.status);
+            throw e;
+        }
         return res.json();
     }
 

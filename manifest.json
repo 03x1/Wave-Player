@@ -1,11 +1,29 @@
 [
   {
     "name": "Wave Player",
-    "description": "Apple Music–style always-on-top miniplayer for Spotify. Compact, expanded and full screen views, word-by-word synced lyrics from four sources, Up Next, colors from the album art, and light on your PC.",
+    "description": "Apple Music–style mini player for Spotify that floats on top of everything. Compact, expanded and full screen views, word-by-word synced lyrics, animated covers, Up Next and a living background from the album art.",
     "preview": "thumbnail.png",
     "main": "waveplayer.js",
     "readme": "README.md",
     "authors": [{ "name": "Sam", "url": "https://github.com/03x1" }],
-    "tags": ["miniplayer", "player", "mini", "lyrics", "synced-lyrics", "karaoke", "queue", "up-next", "apple-music", "apple", "pip", "fullscreen"]
+    "tags": [
+      "miniplayer",
+      "lyrics",
+      "apple music",
+      "fullscreen",
+      "mini player",
+      "full screen",
+      "synced lyrics",
+      "karaoke",
+      "picture in picture",
+      "pip",
+      "always on top",
+      "floating",
+      "now playing",
+      "canvas",
+      "animated cover",
+      "queue",
+      "up next"
+    ]
   }
 ]

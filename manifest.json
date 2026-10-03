@@ -2,7 +2,7 @@
   {
     "name": "Wave Player",
     "description": "Apple Music–style always-on-top miniplayer for Spotify. Compact, expanded and full screen views, word-by-word synced lyrics from four sources, Up Next, colors from the album art, and light on your PC.",
-    "preview": "preview-v3.png",
+    "preview": "thumbnail.png",
     "main": "waveplayer.js",
     "readme": "README.md",
     "authors": [{ "name": "Sam", "url": "https://github.com/03x1" }],

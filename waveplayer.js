@@ -25,9 +25,23 @@
 
     // To release: bump VERSION and add an entry at the top of CHANGELOG.
     // summary = short list on the update screen; notes = full changelog.
-    const VERSION = 'v3';
+    const VERSION = 'v3.1';
 
     const CHANGELOG = [
+        {
+            v: 'v3.1',
+            date: 'October 2026',
+            summary: [
+                { i: 'moon',  c: ['#5c6cff', '#a35cff'], t: 'Custom sleep timer', d: 'Type in exactly how long to play, in hours and minutes.' },
+                { i: 'list',  c: ['#1fa483', '#7ed957'], t: 'No more duplicates', d: 'Adding a song to a playlist it’s already in tells you instead of adding it twice.' },
+                { i: 'heart', c: ['#ff3b5c', '#ff8a3d'], t: 'Like from the menu', d: 'Saving to and removing from Liked Songs works again, with a notification.' },
+            ],
+            notes: [
+                { k: 'Sleep timer', v: 'Set any time in hours and minutes, alongside the presets. It keeps running if you close the player.' },
+                { k: 'Playlists', v: 'Adding a song to a playlist that already has it shows “Already in …” instead of adding it again.' },
+                { k: 'Fixes', v: 'Save to Liked Songs and Remove from Liked Songs in the ⋯ menu did nothing. They work again and show a notification.' },
+            ],
+        },
         {
             v: 'v3',
             date: 'October 2026',
@@ -143,6 +157,8 @@
     let pipWindow       = null;
     let currentLyrics   = null;
     let currentTrackUri = null;
+    // Custom sleep timer (Spotify's own only takes presets). Lives here so it outlasts the player window.
+    let sleepAt = 0, sleepTimeout = null;
 
     /* Album art colours */
 
@@ -891,6 +907,13 @@
     .mi:disabled{opacity:.35;pointer-events:none;}
     .mi .chev{margin-left:auto;padding-left:14px;opacity:.6;}
     .msep{height:1px;margin:4px 8px;background:rgba(255,255,255,.14);}
+    .msleep{display:flex;align-items:center;gap:4px;font-size:13px;padding:4px 10px;}
+    .msleep input{width:38px;border:0;outline:none;border-radius:6px;padding:2px 6px;font:inherit;color:inherit;
+        background:rgba(255,255,255,.12);text-align:center;-moz-appearance:textfield;}
+    .msleep input::-webkit-inner-spin-button,.msleep input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+    .msleep input:focus{background:rgba(255,255,255,.2);}
+    .msleep button{margin-left:auto;padding:2px 10px;border-radius:6px;background:rgba(255,255,255,.16);}
+    .msleep button:hover{background:rgba(255,255,255,.26);}
     #volPop{padding:8px 12px;display:none;align-items:center;gap:10px;width:220px;border-radius:999px;}
     #volPop.show{display:flex;}
     #vMute{width:26px;height:26px;display:grid;place-items:center;color:rgba(255,255,255,.8);}
@@ -1604,8 +1627,8 @@ void main() {
             } else {
                 sp.toggleHeart?.();
             }
-            const lib = uri.startsWith('spotify:episode:') ? 'Your Episodes' : 'Liked Songs';
-            toast(want ? `Saved to ${lib}` : `Removed from ${lib}`);
+            const name = uri.startsWith('spotify:episode:') ? 'Your Episodes' : 'Liked Songs';
+            toast(want ? `Saved to ${name}` : `Removed from ${name}`);
             refreshHeart(uri);
         }
 
@@ -1884,7 +1907,7 @@ void main() {
         let menuItems = [];
         function renderMenu(items, anchor) {
             menuItems = items;
-            el.menu.innerHTML = items.map((m, i) => m === '-' ? '<div class="msep"></div>'
+            el.menu.innerHTML = items.map((m, i) => m === '-' ? '<div class="msep"></div>' : m.html ? m.html
                 : `<button class="mi" role="menuitem" data-i="${i}"${m.off ? ' disabled' : ''}>${esc(m.t)}${m.sub ? '<span class="chev">›</span>' : ''}</button>`).join('');
             el.menu.scrollTop = 0;
             openPop(el.menu, anchor);
@@ -1906,26 +1929,49 @@ void main() {
 
         const SLEEP = [['5 minutes', 1], ['10 minutes', 2], ['15 minutes', 3], ['30 minutes', 4], ['45 minutes', 5], ['1 hour', 6], ['End of track', 7]];
         const hasSleep = () => typeof P?.PlayerAPI?.setSleepTimer === 'function';
+        const hm = min => min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}` : `${min} min`;
         function sleepLabel() {
+            if (sleepAt > Date.now()) return `Sleep timer · ${hm(Math.ceil((sleepAt - Date.now()) / 60000))}`;
             const t = P?.PlayerAPI?.getState?.()?.sleepTimer;
             if (t?.type === 2) return 'Sleep timer · end of track';
             const left = t?.type === 1 ? Math.round((Number(t.timestamp) - Date.now()) / 60000) : 0;
             return left > 0 ? `Sleep timer · ${left} min` : 'Sleep timer';
         }
+        function clearCustomSleep() { clearTimeout(sleepTimeout); sleepAt = 0; }
         async function setSleep(v, label) {
+            clearCustomSleep();
+            if (!hasSleep()) { toast('Sleep timer off'); return; }
             try {
                 await P.PlayerAPI.setSleepTimer(v);
                 toast(v ? `Sleep timer: ${label.toLowerCase()}` : 'Sleep timer off');
             } catch { toast('Couldn’t set the sleep timer'); }
         }
+        function setCustomSleep(min) {
+            if (hasSleep()) P.PlayerAPI.setSleepTimer(0)?.catch?.(() => {});
+            clearCustomSleep();
+            sleepAt = Date.now() + min * 60000;
+            // The main window's timer, not the player window's, so closing the player doesn't cancel it.
+            sleepTimeout = setTimeout(() => { sleepAt = 0; Spicetify.Player.pause(); }, min * 60000);
+            toast(`Sleep timer: ${hm(min)}`);
+        }
         function openSleep() {
-            const on = (P?.PlayerAPI?.getState?.()?.sleepTimer?.type || 0) !== 0;
+            const on = sleepAt > Date.now() || (P?.PlayerAPI?.getState?.()?.sleepTimer?.type || 0) !== 0;
             renderMenu([
                 { t: '‹ Back', sub: true, f: openMenu },
                 '-',
-                ...SLEEP.map(([t, v]) => ({ t, f: () => setSleep(v, t) })),
+                ...(hasSleep() ? SLEEP.map(([t, v]) => ({ t, f: () => setSleep(v, t) })) : []),
+                { html: '<form class="msleep"><input name="h" type="number" min="0" max="23" placeholder="0" aria-label="Hours">h'
+                    + '<input name="m" type="number" min="0" max="59" placeholder="0" aria-label="Minutes">m<button>Set</button></form>' },
                 ...(on ? ['-', { t: 'Turn off', f: () => setSleep(0) }] : []),
             ], el.bDots);
+            const form = el.menu.querySelector('.msleep');
+            form.onsubmit = e => {
+                e.preventDefault();
+                const min = (+form.h.value || 0) * 60 + (+form.m.value || 0);
+                if (min <= 0) { form.m.focus(); return; }
+                closePops();
+                setCustomSleep(min);
+            };
         }
 
         async function openMenu() {
@@ -1945,7 +1991,8 @@ void main() {
                 { t: type === 'episode' ? 'Copy Episode Link' : 'Copy Song Link', off: !id || item?.isLocal || type === 'ad', f: () => {
                     try { P.ClipboardAPI.copy(`https://open.spotify.com/${type}/${id}`); toast('Link copied'); } catch {}
                 } },
-                ...(hasSleep() ? ['-', { t: sleepLabel(), sub: true, f: openSleep }] : []),
+                '-',
+                { t: sleepLabel(), sub: true, f: openSleep },
                 '-',
                 { t: 'Settings', f: () => { panel = 'settings'; layout(); } },
             ], el.bDots);
@@ -1965,6 +2012,9 @@ void main() {
                 { t: '‹ Back', sub: true, f: openMenu },
                 '-',
                 ...(lists.length ? lists.map(l => ({ t: l.name, f: async () => {
+                    let has = false;
+                    try { has = (await P.PlaylistAPI.getContents(l.uri)).items.some(i => i.uri === uri); } catch {}
+                    if (has) { toast(`Already in ${l.name}`); return; }
                     try {
                         await P.PlaylistAPI.add(l.uri, [uri], { after: 'end' });
                         toast(`Added to ${l.name}`);
@@ -2395,6 +2445,8 @@ void main() {
         canvas: '<rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="m10.5 9.5 4 2.5-4 2.5z"/>',
         list:   '<path d="M9 7h11M9 12h11M9 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/>',
         bolt:   '<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/>',
+        moon:   '<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
+        heart:  '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.6 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>',
         full:   '<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>',
     };
     const I_CHEV = '<svg class="wpnChev" viewBox="0 0 24 24"><path d="M9.3 5.3 16 12l-6.7 6.7-1.4-1.4L13.2 12 7.9 6.7z"/></svg>';
